@@ -1,0 +1,46 @@
+files_names = [
+  'Bezier.cpp',
+  'Block.cpp',
+  'CarveHelper.cpp',
+  'ccealignmodule.cpp',
+  'ContourSurf.cpp',
+  'Crystal.cpp',
+  'Err.cpp',
+  'Feedback.cpp',
+  'Field.cpp',
+  'File.cpp',
+  'GenericBuffer.cpp',
+  'GFXManager.cpp',
+  'GraphicsUtil.cpp',
+  'Isosurf.cpp',
+  'Map.cpp',
+  'marching_cubes.cpp',
+  'Match.cpp',
+  'Matrix.cpp',
+  'MemoryDebug.cpp',
+  'MemoryUsage.cpp',
+  'MyPNG.cpp',
+  'os_gl.cpp',
+  'Parse.cpp',
+  'Pixmap.cpp',
+  'PostProcess.cpp',
+  'ShaderMgr.cpp',
+  'ShaderPreprocessor.cpp',
+  'ShaderPrg.cpp',
+  'Sphere.cpp',
+  'Tetsurf.cpp',
+  'Texture.cpp',
+  'Tracker.cpp',
+  'Triangle.cpp',
+  'TTT.cpp',
+  'Util.cpp',
+  'Util2.cpp',
+  'Vector.cpp',
+  'Word.cpp',
+] 
+
+foreach file_name : files_names
+  src_files += files(file_name)
+endforeach
+
+include_dirs += include_directories('.')
