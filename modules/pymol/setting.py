@@ -88,7 +88,7 @@ if True:
                 pass
             return boolean_dict[boolean_sc.auto_err(str(value), "boolean")]
         if type in (cSetting_int, cSetting_float):
-            if is_string(value) and boolean_sc.has_key(value):
+            if is_string(value) and value in boolean_sc:
                 value = boolean_dict[boolean_sc.auto_err(str(value), "boolean")]
             if type == cSetting_int:
                 return int(value)
