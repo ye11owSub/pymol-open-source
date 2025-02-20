@@ -29,6 +29,7 @@ requires = [
 dev = [
   "pillow==11.1.0",
   "pytest==8.2.2",
+  "requests==2.32.3",
 ]
 
 [project.urls]
