@@ -72,7 +72,7 @@ jobs:
       shell: cmd
       run: |-
         CALL %CONDA_ROOT%\\Scripts\\activate.bat
-        conda install -y -c conda-forge -c schrodinger python cmake libpng freetype pyside6 glew libxml2 catch2=2.13.3 glm libnetcdf collada2gltf biopython msgpack-python pip python-build
+        conda install -y -c conda-forge -c schrodinger python cmake libpng freetype pyside6 glew libxml2 catch2=2.13.3 glm libnetcdf collada2gltf biopython msgpack-python pip python-build libffi
 
     - name: Conda info
       shell: cmd
