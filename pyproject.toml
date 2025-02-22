@@ -14,6 +14,7 @@ authors = [
   {name = "Schrodinger", email = "pymol-users@lists.sourceforge.net"},
 ]
 dependencies = [
+  "biopython>=1.80",
   "numpy>=2.0",
 ]
 
@@ -21,13 +22,16 @@ dependencies = [
 build-backend = "backend"
 backend-path = ["_custom_build"]
 requires = [
+  "cmake>=3.30.5",
   "numpy>=2.0",
   "setuptools>=69.2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "msgpack==1.0.8",
   "pillow==11.1.0",
+  "PySide6==6.8.1",
   "pytest==8.2.2",
   "requests==2.32.3",
 ]
