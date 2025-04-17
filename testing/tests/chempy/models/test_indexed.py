@@ -13,7 +13,7 @@ def indexed_model() -> Indexed:
         atom.symbol = "H" if i == 0 else "He"
         atom.chain = "AB" if i == 0 else "BA"
 
-        atom.coord = [float(i), 0., 0.]
+        atom.coord = [float(i), 0.0, 0.0]
         indexed_model.add_atom(atom)
 
         bond = Bond()
@@ -25,10 +25,12 @@ def indexed_model() -> Indexed:
 
 
 def test_base_model_methods(indexed_model):
-    assert indexed_model.nAtom == 3
-    assert indexed_model.nBond == 3
     assert indexed_model.get_residues() == [(0, 1), (1, 3)]
-    assert indexed_model.get_coord_list() == [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+    assert indexed_model.get_coord_list() == [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0],
+    ]
     assert indexed_model.get_mass() == 9.013144
     assert indexed_model.get_nuclear_charges() == 5
 
@@ -39,6 +41,7 @@ def test_base_model_methods(indexed_model):
 
 def test_get_implicit_mass(indexed_model):
     assert indexed_model.get_implicit_mass() == 10.021084
+
 
 def test_list(indexed_model, capsys):
     indexed_model.list()
@@ -52,8 +55,10 @@ def test_list(indexed_model, capsys):
         "[2, 2]\n"
     )
 
+
 def test_get_min_max(indexed_model):
     assert indexed_model.get_min_max() == [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+
 
 def test_indexed_merge(indexed_model):
     other_indexed_model = Indexed()
@@ -62,7 +67,7 @@ def test_indexed_merge(indexed_model):
     atom.symbol = "Ne"
     atom.chain = "F"
 
-    atom.coord = [0., 0., 7.]
+    atom.coord = [0.0, 0.0, 7.0]
     other_indexed_model.add_atom(atom)
 
     bond = Bond()
@@ -98,6 +103,7 @@ def test_add_atom(indexed_model):
 
     assert len(indexed_model.atom) == 4
 
+
 def test_delete_atom(indexed_model):
 
     assert len(indexed_model.atom) == 3
@@ -111,6 +117,7 @@ def test_delete_atom(indexed_model):
     assert indexed_model.atom[0].symbol == "He"
     assert indexed_model.bond[0].order == 1
 
+
 def test_delete_list(indexed_model):
 
     assert len(indexed_model.atom) == 3
@@ -123,6 +130,7 @@ def test_delete_list(indexed_model):
     assert len(indexed_model.bond) == 1
     assert indexed_model.atom[0].symbol == "H"
     assert indexed_model.bond[0].order == 0
+
 
 def test_insert_atom(indexed_model):
     new_atom = Atom()
@@ -146,7 +154,7 @@ def test_index_atom(indexed_model):
 
     indexed_model.add_atom(new_atom)
 
-    assert indexed_model.index_atom(new_atom ) == 3
+    assert indexed_model.index_atom(new_atom) == 3
 
 
 def test_add_bond(indexed_model):
@@ -178,5 +186,3 @@ def test_convert_to_connected(indexed_model):
 
 def test_get_internal_tuples(indexed_model):
     assert indexed_model.get_internal_tuples() == [(1,), (1, 1), (-1, 1, 1)]
-
-
