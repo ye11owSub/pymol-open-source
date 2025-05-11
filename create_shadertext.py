@@ -39,10 +39,9 @@ def create_shadertext(
 
     # get all *.gs *.vs *.fs *.shared from the two input directories
     shader_files = set(
-        chain(
-            (path for path in shader_dir.glob("**/*") if path.suffix in extension_regexp),
-            (path for path in shader_dir2.glob("**/*") if path.suffix in extension_regexp)
-        )
+        path
+        for path in chain(shader_dir.glob("**/*"), shader_dir2.glob("**/*"))
+        if path.suffix in extension_regexp
     )
 
     with (

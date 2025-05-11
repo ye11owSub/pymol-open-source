@@ -19,7 +19,6 @@ from itertools import chain
 from pathlib import Path
 from subprocess import PIPE, Popen
 
-import numpy
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.build_py import build_py
@@ -34,7 +33,7 @@ MAC = sys.platform.startswith("darwin")
 # Have to copy from "create_shadertext.py" script due to the use of pyproject.toml
 # Full explanation:
 # https://github.com/pypa/setuptools/issues/3939
-def create_all(generated_dir: str, pymol_dir: str = "."):
+def create_all(generated_dir: str, pymol_dir: str = ".") -> None:
     """
     Generate various stuff
     """
@@ -58,7 +57,7 @@ def create_shadertext(
     shader_dir2: Path,
     output_header: Path,
     output_source: Path,
-):
+) -> None:
     varname = "_shader_cache_raw"
     include_deps = defaultdict(set)
     ifdef_deps = defaultdict(set)
@@ -66,10 +65,9 @@ def create_shadertext(
 
     # get all *.gs *.vs *.fs *.shared from the two input directories
     shader_files = set(
-        chain(
-            (path for path in shader_dir.glob("**/*") if path.suffix in extension_regexp),
-            (path for path in shader_dir2.glob("**/*") if path.suffix in extension_regexp)
-        )
+        path
+        for path in chain(shader_dir.glob("**/*"), shader_dir2.glob("**/*"))
+        if path.suffix in extension_regexp
     )
 
     with (
@@ -116,7 +114,7 @@ def create_shadertext(
             output_source_file.write("0};\n")
 
 
-def create_buildinfo(output_dir_path: str, pymoldir: str = "."):
+def create_buildinfo(output_dir_path: str, pymoldir: str = ".") -> None:
     output_dir = Path(output_dir_path)
     sha_raw = Popen(["git", "rev-parse", "HEAD"], cwd=pymoldir, stdout=PIPE).stdout
     sha = sha_raw.read().strip().decode() if sha_raw is not None else ""
@@ -128,6 +126,7 @@ def create_buildinfo(output_dir_path: str, pymoldir: str = "."):
     #define _PYMOL_BUILD_GIT_SHA "{sha}"
     """
     )
+
 
 # handle extra arguments
 def str2bool(v: str) -> bool:
@@ -166,7 +165,7 @@ parser.add_argument(
     "--jobs",
     "-j",
     type=int,
-    help="for parallel builds " "(defaults to number of processors)",
+    help="for parallel builds (defaults to number of processors)",
 )
 parser.add_argument(
     "--libxml",
@@ -300,7 +299,6 @@ class build_ext_pymol(build_ext):
         build_temp = Path(self.build_temp) / target_name
         build_temp.mkdir(parents=True, exist_ok=True)
         extdir = Path(self.get_ext_fullpath(ext.name))
-        extdirabs = extdir.absolute()
 
         extdir.parent.mkdir(parents=True, exist_ok=True)
 
@@ -308,7 +306,6 @@ class build_ext_pymol(build_ext):
             return "".join(path.replace("\\", "/") + ";" for path in paths)
 
         config = "Debug" if DEBUG else "Release"
-        lib_output_dir = str(extdir.parent.absolute())
         all_files = ext.sources
         all_src = concat_paths(all_files)
         all_defs = "".join(mac[0] + ";" for mac in ext.define_macros)
@@ -318,13 +315,8 @@ class build_ext_pymol(build_ext):
         all_lib_dirs = concat_paths(ext.library_dirs)
         all_inc_dirs = concat_paths(ext.include_dirs)
 
-        lib_mode = "RUNTIME" if WIN else "LIBRARY"
-
-        shared_suffix = sysconfig.get_config_var("EXT_SUFFIX")
-
         cmake_args = [
             f"-DTARGET_NAME={target_name}",
-            f"-DCMAKE_{lib_mode}_OUTPUT_DIRECTORY={lib_output_dir}",
             f"-DCMAKE_BUILD_TYPE={config}",
             f"-DALL_INC_DIR={all_inc_dirs}",
             f"-DALL_SRC={all_src}",
@@ -333,7 +325,6 @@ class build_ext_pymol(build_ext):
             f"-DALL_LIB={all_libs}",
             f"-DALL_COMP_ARGS={all_comp_args}",
             f"-DALL_EXT_LINK={all_ext_link}",
-            f"-DSHARED_SUFFIX={shared_suffix}",
         ]
 
         # example of build args
@@ -347,16 +338,6 @@ class build_ext_pymol(build_ext):
         if not self.dry_run:
             self.spawn(["cmake", "--build", "."] + build_args)
 
-        if WIN:
-            # Move up from VS release folder
-            cmake_lib_loc = Path(
-                lib_output_dir, "Release", f"{target_name}{shared_suffix}"
-            )
-            if cmake_lib_loc.exists():
-                shutil.move(cmake_lib_loc, extdirabs)
-
-        # Troubleshooting: if fail on line above then delete all possible
-        # temporary CMake files including "CMakeCache.txt" in top level dir.
         os.chdir(str(cwd))
 
 
@@ -430,9 +411,7 @@ class install_pymol(install):
             self.copy(name, os.path.join(base_path, name))
 
         if options.openvr:
-            self.copy(
-                "contrib/vr/README.md", os.path.join(base_path, "README-VR.txt")
-            )
+            self.copy("contrib/vr/README.md", os.path.join(base_path, "README-VR.txt"))
 
     def make_launch_script(self):
         if sys.platform.startswith("win"):
@@ -491,9 +470,6 @@ create_all(generated_dir)
 # can be changed with environment variable PREFIX_PATH
 prefix_path = get_prefix_path()
 
-inc_dirs = [
-    "include",
-]
 
 pymol_src_dirs = [
     "ov/src",
@@ -505,34 +481,12 @@ pymol_src_dirs = [
     "layer5",
     generated_dir,
 ]
-
-def_macros = [
-    ("_PYMOL_LIBPNG", None),
-    ("_PYMOL_FREETYPE", None),
-]
-
-if DEBUG and not WIN:
-    def_macros += [
-        # bounds checking in STL containers
-        ("_GLIBCXX_ASSERTIONS", None),
-    ]
-
 libs = ["png", "freetype"]
+
+inc_dirs = []
+def_macros = []
 lib_dirs = []
-ext_comp_args = (
-    [
-        "-Werror=return-type",
-        "-Wunused-variable",
-        "-Wno-switch",
-        "-Wno-narrowing",
-        # legacy stuff
-        "-Wno-char-subscripts",
-        # optimizations
-        "-Og" if DEBUG else "-O3",
-    ]
-    if not WIN
-    else ["/MP"]
-)
+ext_comp_args = []
 ext_link_args = []
 ext_objects = []
 data_files = []
@@ -550,18 +504,6 @@ if options.use_openmp == "yes":
     else:
         ext_comp_args += ["-fopenmp"]
         ext_link_args += ["-fopenmp"]
-
-if options.vmd_plugins:
-    # VMD plugin support
-    inc_dirs += [
-        "contrib/uiuc/plugins/include",
-    ]
-    pymol_src_dirs += [
-        "contrib/uiuc/plugins/molfile_plugin/src",
-    ]
-    def_macros += [
-        ("_PYMOL_VMD_PLUGINS", None),
-    ]
 
 if options.libxml:
     # COLLADA support
@@ -601,12 +543,9 @@ if options.openvr:
 
 inc_dirs += pymol_src_dirs
 
-inc_dirs += ["contrib/pocketfft"]
-
 # ============================================================================
 if MAC:
     libs += ["GLEW"]
-    def_macros += [("PYMOL_CURVE_VALIDATE", None)]
 
     if options.osx_frameworks:
         ext_link_args += [
@@ -625,12 +564,7 @@ if MAC:
         ]
 
 if WIN:
-    # clear
-    libs = []
-
-    def_macros += [
-        ("WIN32", None),
-    ]
+    libs.clear()
 
     libs += [
         "Advapi32",  # Registry (RegCloseKey etc.)
@@ -653,10 +587,6 @@ if WIN:
         ]
     )
 
-    if DEBUG:
-        ext_comp_args += ["/Z7"]
-        ext_link_args += ["/DEBUG"]
-
     libs += [
         "opengl32",
     ]
@@ -676,7 +606,7 @@ if options.use_vtkm != "no":
             break
     else:
         raise LookupError(
-            "VTK-m headers not found." f' PREFIX_PATH={":".join(prefix_path)}'
+            f"VTK-m headers not found. PREFIX_PATH={':'.join(prefix_path)}"
         )
     def_macros += [
         ("_PYMOL_VTKM", None),
@@ -693,6 +623,16 @@ if options.use_vtkm != "no":
     ]
 
 if options.vmd_plugins:
+    # VMD plugin support
+    inc_dirs += [
+        "contrib/uiuc/plugins/include",
+    ]
+    pymol_src_dirs += [
+        "contrib/uiuc/plugins/molfile_plugin/src",
+    ]
+    def_macros += [
+        ("_PYMOL_VMD_PLUGINS", None),
+    ]
     libs += [
         "netcdf",
     ]
@@ -701,13 +641,6 @@ if options.openvr:
     libs += [
         "openvr_api",
     ]
-
-inc_dirs += [
-    numpy.get_include(),
-]
-def_macros += [
-    ("_PYMOL_NUMPY", None),
-]
 
 for prefix in prefix_path:
     for dirs, suffixes in [
@@ -724,37 +657,20 @@ for prefix in prefix_path:
     ]:
         dirs.extend(filter(os.path.isdir, [os.path.join(prefix, *s) for s in suffixes]))
 
-# optimization currently causes a clang segfault on OS X 10.9 when
-# compiling layer2/RepCylBond.cpp
-if MAC:
-    ext_comp_args += ["-fno-strict-aliasing"]
 
-
-def get_pymol_version():
+def get_pymol_version() -> str:
     return re.findall(r'_PyMOL_VERSION "(.*)"', open("layer0/Version.h").read())[0]
 
 
-def get_sources(subdirs, suffixes=(".c", ".cpp")):
+def get_sources(subdirs, suffixes=(".c", ".cpp")) -> list[str]:
     return sorted(
         [f for d in subdirs for s in suffixes for f in glob.glob(d + "/*" + s)]
     )
 
-# Python includes
-inc_dirs.append(sysconfig.get_paths()["include"])
-inc_dirs.append(sysconfig.get_paths()["platinclude"])
-
-champ_inc_dirs = ["contrib/champ"]
-champ_inc_dirs.append(sysconfig.get_paths()["include"])
-champ_inc_dirs.append(sysconfig.get_paths()["platinclude"])
-
-if WIN:
-    # pyconfig.py forces linking against pythonXY.lib on MSVC
-    py_lib = Path(sysconfig.get_paths()["stdlib"]).parent / "libs"
-    lib_dirs.append(str(py_lib))
 
 ext_modules += [
     CMakeExtension(
-        name="pymol._cmd",
+        name="_cmd",
         sources=get_sources(pymol_src_dirs),
         include_dirs=inc_dirs,
         libraries=libs,
@@ -762,12 +678,6 @@ ext_modules += [
         define_macros=def_macros,
         extra_link_args=ext_link_args,
         extra_compile_args=ext_comp_args,
-    ),
-    CMakeExtension(
-        name="chempy.champ._champ",
-        sources=get_sources(["contrib/champ"]),
-        include_dirs=champ_inc_dirs,
-        library_dirs=lib_dirs,
     ),
 ]
 
