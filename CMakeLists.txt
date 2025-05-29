@@ -8,6 +8,12 @@ set(Python_FIND_STRATEGY LOCATION)
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development NumPy)
 
+add_library(${TARGET_NAME} SHARED ${ALL_SRC})
+
+foreach(FOLDER_NAME IN ITEMS layer0 layer1 layer2 layer3 layer4 layer5 ov)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/${FOLDER_NAME}/sources.cmake)
+endforeach()
+
 target_link_options(${TARGET_NAME} PRIVATE
     "$<$<PLATFORM_ID:Darwin>:LINKER:-undefined,dynamic_lookup>"
 )
@@ -25,6 +31,7 @@ target_compile_options(${TARGET_NAME} PRIVATE
         $<$<NOT:$<CONFIG:Debug>>:-O3>
     >
     $<$<CXX_COMPILER_ID:MSVC>:/MP>
+    $<$<CXX_COMPILER_ID:MSVC>:/std:c++17>
     $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>:/Z7>
 
     # optimization currently causes a clang segfault on OS X 10.9 when
@@ -59,8 +66,6 @@ set_output_path(${TARGET_NAME} "${Python_SITEARCH}/pymol")
 
 target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
 
-add_library(${TARGET_NAME} SHARED ${ALL_SRC})
-
 target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/contrib/pocketfft
@@ -76,6 +81,7 @@ target_link_directories(${TARGET_NAME} PUBLIC
 target_link_libraries(${TARGET_NAME}
     ${ALL_LIB}
     ${ALL_EXT_LINK}
+    # pyconfig.py forces linking against pythonXY.lib on MSVC
     $<$<CXX_COMPILER_ID:MSVC>:${Python_LIBRARIES}>
     $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>:/DEBUG>
 )
@@ -89,7 +95,7 @@ target_compile_definitions(${TARGET_NAME} PUBLIC
     $<$<PLATFORM_ID:Darwin>:PYMOL_CURVE_VALIDATE>
 
     # bounds checking in STL containers
-    # if DEBUG and not Windows
+    # if DEBUG and not Windows compiler
     $<$<AND:$<CONFIG:Debug>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:_GLIBCXX_ASSERTIONS>
 )
 

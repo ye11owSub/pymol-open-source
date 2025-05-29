@@ -1,8 +1,17 @@
 set(CHEMPY_PROJECT_NAME _champ)
 
-file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
-
-add_library(${CHEMPY_PROJECT_NAME} MODULE ${SOURCES})
+add_library(${CHEMPY_PROJECT_NAME} MODULE
+    champ.c
+    champ_module.c
+    chiral.c
+    err2.c
+    feedback2.c
+    list.c
+    os_memory.c
+    sort.c
+    strblock.c
+    vla.c
+)
 
 target_link_options(${CHEMPY_PROJECT_NAME} PRIVATE
     "$<$<PLATFORM_ID:Darwin>:LINKER:-undefined,dynamic_lookup>"
@@ -17,6 +26,7 @@ target_link_directories(${CHEMPY_PROJECT_NAME} PUBLIC
 )
 
 target_link_libraries(${CHEMPY_PROJECT_NAME} PUBLIC
+    # pyconfig.py forces linking against pythonXY.lib on MSVC
     $<$<CXX_COMPILER_ID:MSVC>:${Python_LIBRARIES}>
 )
 

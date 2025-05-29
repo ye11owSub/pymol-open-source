@@ -471,16 +471,7 @@ create_all(generated_dir)
 prefix_path = get_prefix_path()
 
 
-pymol_src_dirs = [
-    "ov/src",
-    "layer0",
-    "layer1",
-    "layer2",
-    "layer3",
-    "layer4",
-    "layer5",
-    generated_dir,
-]
+pymol_src_dirs = [generated_dir]
 libs = ["png", "freetype"]
 
 inc_dirs = []
@@ -641,6 +632,8 @@ if options.openvr:
     libs += [
         "openvr_api",
     ]
+
+inc_dirs += pymol_src_dirs
 
 for prefix in prefix_path:
     for dirs, suffixes in [
