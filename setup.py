@@ -7,7 +7,6 @@
 # pre-installed into the system.
 
 import argparse
-import glob
 import os
 import re
 import shutil
@@ -195,89 +194,6 @@ parser.add_argument(
 options, sys.argv[1:] = parser.parse_known_args(namespace=options)
 
 
-def get_prefix_path() -> list[str]:
-    """
-    Return a list of paths which will be searched for "include",
-    "include/freetype2", "lib", "lib64" etc.
-    """
-    paths = []
-
-    if (prefix_path := os.environ.get("PREFIX_PATH")) is not None:
-        paths += prefix_path.split(os.pathsep)
-
-    if sys.platform.startswith("freebsd"):
-        paths += ["/usr/local"]
-
-    if not options.osx_frameworks:
-        paths += ["usr/X11"]
-
-    if MAC:
-        for prefix in ["/sw", "/opt/local", "/usr/local"]:
-            if sys.base_prefix.startswith(prefix):
-                paths += [prefix]
-
-    if is_conda_env():
-        if WIN:
-            if "CONDA_PREFIX" in os.environ:
-                paths += [os.path.join(os.environ["CONDA_PREFIX"], "Library")]
-            paths += [os.path.join(sys.prefix, "Library")]
-
-        paths += [sys.prefix] + paths
-
-    paths += ["/usr"]
-
-    return paths
-
-
-def is_conda_env():
-    return (
-        "conda" in sys.prefix
-        or "conda" in sys.version
-        or "Continuum" in sys.version
-        or sys.prefix == os.getenv("CONDA_PREFIX")
-    )
-
-
-def guess_msgpackc():
-    for prefix in prefix_path:
-        for suffix in ["h", "hpp"]:
-            f = os.path.join(prefix, "include", "msgpack", f"version_master.{suffix}")
-
-            try:
-                m = re.search(r"MSGPACK_VERSION_MAJOR\s+(\d+)", open(f).read())
-            except EnvironmentError:
-                continue
-
-            if m is not None:
-                major = int(m.group(1))
-                if major > 1:
-                    return "c++11"
-
-    return "no"
-
-
-class CMakeExtension(Extension):
-    def __init__(
-        self,
-        name,
-        sources,
-        include_dirs=[],
-        libraries=[],
-        library_dirs=[],
-        define_macros=[],
-        extra_link_args=[],
-        extra_compile_args=[],
-    ):
-        # don't invoke the original build_ext for this special extension
-        super().__init__(name, sources=[])
-        self.sources = sources
-        self.include_dirs = include_dirs
-        self.libraries = libraries
-        self.library_dirs = library_dirs
-        self.define_macros = define_macros
-        self.extra_link_args = extra_link_args
-        self.extra_compile_args = extra_compile_args
-
 
 class build_ext_pymol(build_ext):
     def initialize_options(self) -> None:
@@ -306,25 +222,22 @@ class build_ext_pymol(build_ext):
             return "".join(path.replace("\\", "/") + ";" for path in paths)
 
         config = "Debug" if DEBUG else "Release"
-        all_files = ext.sources
-        all_src = concat_paths(all_files)
-        all_defs = "".join(mac[0] + ";" for mac in ext.define_macros)
-        all_libs = "".join(f"{lib};" for lib in ext.libraries)
-        all_ext_link = " ".join(ext.extra_link_args)
-        all_comp_args = "".join(f"{arg};" for arg in ext.extra_compile_args)
-        all_lib_dirs = concat_paths(ext.library_dirs)
-        all_inc_dirs = concat_paths(ext.include_dirs)
+        all_src = concat_paths(ext.sources)
 
         cmake_args = [
             f"-DTARGET_NAME={target_name}",
             f"-DCMAKE_BUILD_TYPE={config}",
-            f"-DALL_INC_DIR={all_inc_dirs}",
+            f"-DALL_INC_DIR={';'.join(ext.include_dirs)}",
             f"-DALL_SRC={all_src}",
-            f"-DALL_DEF={all_defs}",
-            f"-DALL_LIB_DIR={all_lib_dirs}",
-            f"-DALL_LIB={all_libs}",
-            f"-DALL_COMP_ARGS={all_comp_args}",
-            f"-DALL_EXT_LINK={all_ext_link}",
+            f"-DPYMOL_GLUT={options.glut}",
+            f"-DPYMOL_LIBXML2={options.libxml}",
+            f"-DPYMOL_OSX_FRAMEWORKS={options.osx_frameworks}",
+            f"-DPYMOL_USE_OPENMP={options.use_openmp}",
+            f"-DPYMOL_TESTING={options.testing}",
+            f"-DPYMOL_OPENVR={options.openvr}",
+            f"-DPYMOL_VMD_PLUGINS={options.vmd_plugins}",
+            f"-DPYMOL_USE_VTKM={options.use_vtkm}",
+            f"-DPYMOL_USE_MSGPACKC={options.use_msgpackc}",
         ]
 
         # example of build args
@@ -339,11 +252,6 @@ class build_ext_pymol(build_ext):
             self.spawn(["cmake", "--build", "."] + build_args)
 
         os.chdir(str(cwd))
-
-
-class build_py_pymol(build_py):
-    def run(self):
-        build_py.run(self)
 
 
 class install_pymol(install):
@@ -467,219 +375,23 @@ generated_dir = os.path.join(os.environ.get("PYMOL_BLD", "build"), "generated")
 
 create_all(generated_dir)
 
-# can be changed with environment variable PREFIX_PATH
-prefix_path = get_prefix_path()
-
-
-pymol_src_dirs = [generated_dir]
-libs = ["png", "freetype"]
-
-inc_dirs = []
-def_macros = []
-lib_dirs = []
-ext_comp_args = []
-ext_link_args = []
-ext_objects = []
-data_files = []
-ext_modules = []
-
-if options.use_openmp == "yes":
-    def_macros += [
-        ("PYMOL_OPENMP", None),
-    ]
-    if MAC:
-        ext_comp_args += ["-Xpreprocessor", "-fopenmp"]
-        libs += ["omp"]
-    elif WIN:
-        ext_comp_args += ["/openmp"]
-    else:
-        ext_comp_args += ["-fopenmp"]
-        ext_link_args += ["-fopenmp"]
-
-if options.libxml:
-    # COLLADA support
-    def_macros += [("_HAVE_LIBXML", None)]
-    libs += ["xml2"]
-
-if options.use_msgpackc == "guess":
-    options.use_msgpackc = guess_msgpackc()
-
-if options.use_msgpackc == "no":
-    def_macros += [("_PYMOL_NO_MSGPACKC", None)]
-else:
-    if options.use_msgpackc == "c++11":
-        def_macros += [
-            ("MMTF_MSGPACK_USE_CPP11", None),
-            ("MSGPACK_NO_BOOST", None),
-        ]
-    else:
-        libs += ["msgpackc"]
-
-    pymol_src_dirs += ["contrib/mmtf-c"]
-
-if not options.glut:
-    def_macros += [
-        ("_PYMOL_NO_MAIN", None),
-    ]
-
-if options.testing:
-    pymol_src_dirs += ["layerCTest"]
-    def_macros += [("_PYMOL_CTEST", None)]
-
-if options.openvr:
-    def_macros += [("_PYMOL_OPENVR", None)]
-    pymol_src_dirs += [
-        "contrib/vr",
-    ]
-
-inc_dirs += pymol_src_dirs
-
-# ============================================================================
-if MAC:
-    libs += ["GLEW"]
-
-    if options.osx_frameworks:
-        ext_link_args += [
-            "-framework OpenGL",
-        ] + (options.glut) * [
-            "-framework GLUT",
-        ]
-        def_macros += [
-            ("_PYMOL_OSX", None),
-        ]
-    else:
-        libs += [
-            "GL",
-        ] + (options.glut) * [
-            "glut",
-        ]
-
-if WIN:
-    libs.clear()
-
-    libs += [
-        "Advapi32",  # Registry (RegCloseKey etc.)
-        "Ws2_32",  # htonl
-    ]
-
-    libs += (
-        [
-            "glew32",
-            "freetype",
-            "libpng",
-        ]
-        + (options.glut)
-        * [
-            "freeglut",
-        ]
-        + (options.libxml)
-        * [
-            "libxml2",
-        ]
-    )
-
-    libs += [
-        "opengl32",
-    ]
-
-if not (MAC or WIN):
-    libs += [
-        "GL",
-        "GLEW",
-    ] + (options.glut) * [
-        "glut",
-    ]
-
-if options.use_vtkm != "no":
-    for prefix in prefix_path:
-        vtkm_inc_dir = os.path.join(prefix, "include", f"vtkm-{options.use_vtkm}")
-        if os.path.exists(vtkm_inc_dir):
-            break
-    else:
-        raise LookupError(
-            f"VTK-m headers not found. PREFIX_PATH={':'.join(prefix_path)}"
-        )
-    def_macros += [
-        ("_PYMOL_VTKM", None),
-    ]
-    inc_dirs += [
-        vtkm_inc_dir,
-        vtkm_inc_dir + "/vtkm/thirdparty/diy/vtkmdiy/include",
-        vtkm_inc_dir + "/vtkm/thirdparty/lcl/vtkmlcl",
-    ]
-    libs += [
-        f"vtkm_cont-{options.use_vtkm}",
-        f"vtkm_filter_contour-{options.use_vtkm}",
-        f"vtkm_filter_core-{options.use_vtkm}",
-    ]
-
-if options.vmd_plugins:
-    # VMD plugin support
-    inc_dirs += [
-        "contrib/uiuc/plugins/include",
-    ]
-    pymol_src_dirs += [
-        "contrib/uiuc/plugins/molfile_plugin/src",
-    ]
-    def_macros += [
-        ("_PYMOL_VMD_PLUGINS", None),
-    ]
-    libs += [
-        "netcdf",
-    ]
-
-if options.openvr:
-    libs += [
-        "openvr_api",
-    ]
-
-inc_dirs += pymol_src_dirs
-
-for prefix in prefix_path:
-    for dirs, suffixes in [
-        [
-            inc_dirs,
-            [
-                ("include",),
-                ("include", "freetype2"),
-                ("include", "libxml2"),
-                ("include", "openvr"),
-            ],
-        ],
-        [lib_dirs, [("lib64",), ("lib",)]],
-    ]:
-        dirs.extend(filter(os.path.isdir, [os.path.join(prefix, *s) for s in suffixes]))
-
+pymol_src_dirs = [str(Path(generated_dir) / "ShaderText.cpp")]
 
 def get_pymol_version() -> str:
     return re.findall(r'_PyMOL_VERSION "(.*)"', open("layer0/Version.h").read())[0]
 
 
-def get_sources(subdirs, suffixes=(".c", ".cpp")) -> list[str]:
-    return sorted(
-        [f for d in subdirs for s in suffixes for f in glob.glob(d + "/*" + s)]
-    )
-
-
-ext_modules += [
-    CMakeExtension(
-        name="_cmd",
-        sources=get_sources(pymol_src_dirs),
-        include_dirs=inc_dirs,
-        libraries=libs,
-        library_dirs=lib_dirs,
-        define_macros=def_macros,
-        extra_link_args=ext_link_args,
-        extra_compile_args=ext_comp_args,
-    ),
-]
-
 setup(
     cmdclass={
         "build_ext": build_ext_pymol,
-        "build_py": build_py_pymol,
         "install": install_pymol,
     },
     version=get_pymol_version(),
-    ext_modules=ext_modules,
+    ext_modules=[
+        Extension(
+            name="_cmd",
+            sources=pymol_src_dirs,
+            include_dirs=[generated_dir],
+        )
+    ],
 )

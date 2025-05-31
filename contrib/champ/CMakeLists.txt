@@ -13,6 +13,8 @@ add_library(${CHEMPY_PROJECT_NAME} MODULE
     vla.c
 )
 
+include(Helpers)
+
 target_link_options(${CHEMPY_PROJECT_NAME} PRIVATE
     "$<$<PLATFORM_ID:Darwin>:LINKER:-undefined,dynamic_lookup>"
 )
